@@ -14,7 +14,7 @@ reads the diff, and tells you whether that's actually true.
 
 <br>
 
-<img src="examples/demo/groundtruth-demo.gif" alt="An AI agent claims it finished the task and all tests pass; groundtruth runs the checks and busts six overclaims." width="820">
+<img src="https://raw.githubusercontent.com/MSal2020/groundtruth/main/examples/demo/groundtruth-demo.gif" alt="An AI agent claims it finished the task and all tests pass; groundtruth runs the checks and busts six overclaims." width="820">
 
 </div>
 

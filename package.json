@@ -43,6 +43,14 @@
   ],
   "author": "Muhammad Salmaan Ahmed Nusrath",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/MSal2020/groundtruth.git"
+  },
+  "bugs": {
+    "url": "https://github.com/MSal2020/groundtruth/issues"
+  },
+  "homepage": "https://github.com/MSal2020/groundtruth#readme",
   "engines": {
     "node": ">=18"
   },

@@ -1,0 +1,5 @@
+blank_issues_enabled: true
+contact_links:
+  - name: 💡 Feature / new verifier idea
+    url: https://github.com/MSal2020/groundtruth/discussions
+    about: Propose a new class of overclaim to catch, or language support.

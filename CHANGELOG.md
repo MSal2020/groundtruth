@@ -1,0 +1,23 @@
+# Changelog
+
+All notable changes to this project are documented here. Format loosely follows
+[Keep a Changelog](https://keepachangelog.com/).
+
+## [0.1.0] — 2026-06-14
+
+First release. Catch your AI coding agent when it lies.
+
+### Added
+- **CLI** (`groundtruth`, `gt`) — verifies the working-tree diff against the agent's claims; `--json` / `--markdown` / `--quiet` output; non-zero exit on an overclaim.
+- **Claude Code `Stop` hook** (`groundtruth hook`, `groundtruth init`) — returns `decision:"block"` so the agent can't end its turn on an overclaim; respects `stop_hook_active` to avoid loops.
+- **Verifiers**:
+  - `tests` — runs the suite (vitest / jest / `node --test`) and compares to "tests pass"; flags green-but-zero-tests.
+  - `harness` — `.skip` / `.only` / `xit` (incl. aliased), `@pytest.mark.skip`, `sys.exit(0)`, deleted assertions.
+  - `stubs` — `throw "TODO"`, `NotImplementedError`, empty bodies, placeholders; escalated to a failure when tied to a claimed symbol.
+  - `deps` — imports/dependencies that don't exist on the npm registry (hallucination / slopsquatting).
+  - `build` — `tsc --noEmit` for "it compiles" claims.
+  - `claims` — "added tests" with no new test case; "implemented X" missing from the diff.
+- Claim extraction from `--claim`, piped stdin, or a Claude Code transcript (`--transcript` / `--auto-transcript`).
+- Demo (`examples/demo/run.sh`) and a reproducible README GIF (VHS).
+
+[0.1.0]: https://github.com/MSal2020/groundtruth/releases/tag/v0.1.0
