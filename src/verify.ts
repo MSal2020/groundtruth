@@ -51,6 +51,22 @@ export async function verify(opts: VerifyOptions): Promise<Verdict> {
 
   const receipts = results.flat();
 
+  // The agent claimed substantive work but the working tree has no changes —
+  // the "declared victory on an empty branch" failure mode. A warning (not a
+  // failure) because the work may simply have been committed already.
+  const substantive = opts.claims.some(
+    (c) => c.type === "implementation" || c.type === "tests" || c.type === "done"
+  );
+  if (opts.diff.length === 0 && substantive) {
+    receipts.push({
+      status: "warning",
+      verifier: "claims",
+      title: "agent claimed work, but the diff is empty",
+      detail:
+        "No changes in the working tree. If the agent committed its work, re-run with --base <ref>; otherwise it claimed work it didn't do.",
+    });
+  }
+
   // Capstone: if the agent declared "done" but something failed, call it out.
   const doneClaim = opts.claims.find((c) => c.type === "done");
   const failed = receipts.filter((r) => r.status === "failed");

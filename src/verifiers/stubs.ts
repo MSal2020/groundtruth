@@ -15,17 +15,22 @@ import {
 interface Rule {
   re: RegExp;
   label: string;
+  // `noisy` rules (a bare TODO, an empty catch) only surface when the agent
+  // also claimed the work is done / has no placeholders. The strong rules (a
+  // function that literally throws "not implemented") always surface.
+  noisy?: boolean;
 }
 
 const RULES: Rule[] = [
   { re: /throw\s+new\s+\w*Error\(\s*[`'"][^`'"]*\b(?:not\s*implemented|unimplemented|todo|implement\s+this|implement\s+later)\b/i, label: "throws 'not implemented'" },
   { re: /\braise\s+NotImplementedError\b/, label: "raises NotImplementedError" },
   { re: /\bpanic\(\s*[`'"][^`'"]*\b(?:todo|not\s*implemented)/i, label: "panic('TODO')" },
-  { re: /\/\/\s*(?:TODO|FIXME|XXX|HACK)\b/, label: "TODO/FIXME comment" },
-  { re: /#\s*(?:TODO|FIXME|XXX)\b/, label: "TODO/FIXME comment" },
-  { re: /\/\*\s*(?:TODO|FIXME)\b/, label: "TODO/FIXME comment" },
-  { re: /\b(?:coming\s+soon|implement(?:ed)?\s+later|not\s+yet\s+implemented|stub(?:bed)?\s+out)\b/i, label: "placeholder text" },
-  { re: /catch\s*\([^)]*\)\s*\{\s*\}/, label: "empty catch block (swallows errors)" },
+  { re: /\bnot\s+yet\s+implemented\b/i, label: "placeholder text" },
+  { re: /\/\/\s*(?:TODO|FIXME|XXX|HACK)\b/, label: "TODO/FIXME comment", noisy: true },
+  { re: /#\s*(?:TODO|FIXME|XXX)\b/, label: "TODO/FIXME comment", noisy: true },
+  { re: /\/\*\s*(?:TODO|FIXME)\b/, label: "TODO/FIXME comment", noisy: true },
+  { re: /\b(?:coming\s+soon|implement(?:ed)?\s+later|stub(?:bed)?\s+out)\b/i, label: "placeholder text", noisy: true },
+  { re: /catch\s*\([^)]*\)\s*\{\s*\}/, label: "empty catch block (swallows errors)", noisy: true },
 ];
 
 export const stubsVerifier: Verifier = {
@@ -53,6 +58,10 @@ export const stubsVerifier: Verifier = {
       }
     }
 
+    const hasCompletionClaim = opts.claims.some(
+      (c) => c.type === "done" || c.type === "no-placeholders"
+    );
+
     const lines = addedLines(opts.diff, (p) => isCodeFile(p) && !isTestFile(p));
     const failedFiles = new Set<string>(); // one hard failure per claimed file
     const seenWarnings = new Set<string>(); // dedupe warnings by file+label
@@ -61,6 +70,9 @@ export const stubsVerifier: Verifier = {
       for (const rule of RULES) {
         if (!rule.re.test(ln.text)) continue;
         const claim = fileClaim.get(ln.file);
+
+        // Suppress noisy placeholders unless the agent claimed completion.
+        if (!claim && rule.noisy && !hasCompletionClaim) break;
 
         if (claim) {
           if (failedFiles.has(ln.file)) break; // already reported this file

@@ -16,8 +16,13 @@ git clone https://github.com/MSal2020/groundtruth
 cd groundtruth
 npm install
 npm run build
-npm test        # 18+ tests, all deterministic
+npm test        # unit tests, all deterministic
+npm run eval    # precision/recall against the scenario corpus (hits npm registry)
 ```
+
+When you add or change detection, add a case to `eval/cases.mjs` — a `lying`
+case it should catch, or (just as important) an `honest` case it must not flag —
+and keep `npm run eval` at 100%.
 
 groundtruth is tested with groundtruth — run `node dist/cli.js --claim "tests pass and it compiles" --build` before opening a PR.
 

@@ -140,6 +140,25 @@ When the agent stops, `groundtruth` verifies its claims. If they don't hold, it 
 | **build** | "it compiles / no type errors" → runs `tsc --noEmit` (`--build`). |
 | **claims** | "added tests" with no new test case; "implemented X" where X isn't in the diff. |
 
+## Does it actually work?
+
+A verifier that cries wolf is worse than useless, so groundtruth ships with an
+evaluation corpus of real scenarios — overclaims it must catch *and* honest
+changes it must leave alone (path aliases, `workspace:` packages, `#` subpath
+imports, legitimately skipped tests, real refactors).
+
+```
+$ npm run eval
+  lying caught (TP):    9
+  lies missed  (FN):    0
+  honest ok    (TN):    11
+  false alarms (FP):    0   <- false positives (credibility killers)
+  precision: 100.0%   recall: 100.0%   F1: 100.0%
+```
+
+Run it yourself with `npm run eval`. Found a lie it misses or an honest change it
+flags? That's the most valuable issue you can open — see the templates.
+
 ## Roadmap
 
 - [ ] Python & Go verifiers (test detection, stubs, PyPI checks)

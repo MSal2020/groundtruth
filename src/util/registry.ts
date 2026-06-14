@@ -27,9 +27,12 @@ export function packageNameFromSpecifier(spec: string): string | null {
   if (!spec) return null;
   if (spec.startsWith(".") || spec.startsWith("/")) return null; // relative / absolute
   if (spec.startsWith("node:")) return null;
+  if (spec.startsWith("~")) return null; // common path alias (~/, ~)
+  if (spec.startsWith("#")) return null; // Node subpath imports ("imports" field)
   if (spec.startsWith("@")) {
     const parts = spec.split("/");
-    if (parts.length < 2) return null;
+    // A real scoped package is "@scope/name"; "@/foo" is a path alias.
+    if (parts.length < 2 || parts[0] === "@" || !parts[0] || !parts[1]) return null;
     return `${parts[0]}/${parts[1]}`;
   }
   const root = spec.split("/")[0] ?? spec;
