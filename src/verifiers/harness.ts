@@ -12,9 +12,12 @@ interface Rule {
 }
 
 const RULES: Rule[] = [
-  { re: /\b(?:it|test|describe|context|suite)\.skip\b/, label: "skipped test", severity: "failed" },
+  // `.skip(` / `.only(` catch aliased imports too (test.skip, it.skip,
+  // describe.skip, and `const t = require("node:test"); t.skip(...)`).
+  // Safe because this verifier only scans test files.
+  { re: /\.skip\s*\(/, label: "skipped test", severity: "failed" },
   { re: /\bx(?:it|test|describe)\b/, label: "skipped test (x-prefix)", severity: "failed" },
-  { re: /\b(?:it|test|describe|fit|fdescribe)\.only\b/, label: "focused test (hides the rest of the suite)", severity: "warning" },
+  { re: /\.only\s*\(/, label: "focused test (hides the rest of the suite)", severity: "warning" },
   { re: /@pytest\.mark\.(?:skip|xfail)\b/, label: "pytest skip/xfail", severity: "failed" },
   { re: /\bpytest\.skip\s*\(/, label: "pytest.skip()", severity: "failed" },
   { re: /\bunittest\.skip\b/, label: "unittest skip", severity: "failed" },

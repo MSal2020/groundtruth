@@ -106,6 +106,20 @@ export const testsVerifier: Verifier = {
     const tail = (signal.length ? signal : allLines).slice(0, 10).join("\n");
 
     if (passed) {
+      // A green suite that ran zero tests is a classic way to fake "tests pass"
+      // (e.g. skipping the only test).
+      if (claim && counts.passed === 0) {
+        return [
+          {
+            status: "warning",
+            verifier: "tests",
+            title: `"${claim.text}" — but the suite ran 0 tests`,
+            detail: `Ran \`${runner.label}\`: exit code 0, but no tests actually executed (all skipped or none found).`,
+            evidence: tail,
+            claim,
+          },
+        ];
+      }
       return [
         {
           status: "verified",

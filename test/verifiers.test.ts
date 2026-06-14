@@ -25,6 +25,13 @@ test("harness verifier flags a skipped test", async () => {
   assert.match(receipts[0]!.title, /skipped test/);
 });
 
+test("harness verifier flags an aliased skip (t.skip)", async () => {
+  const diff = [diffOf("test/c.test.js", [`t.skip("works", () => {})`])];
+  const receipts = await harnessVerifier.run({ cwd: CWD, claims: [], diff });
+  assert.equal(receipts[0]!.status, "failed");
+  assert.match(receipts[0]!.title, /skipped test/);
+});
+
 test("harness verifier flags exit(0) inside a test", async () => {
   const diff = [diffOf("test/b_test.py", ["    sys.exit(0)"])];
   const receipts = await harnessVerifier.run({ cwd: CWD, claims: [], diff });
