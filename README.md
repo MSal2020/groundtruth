@@ -12,9 +12,14 @@ reads the diff, and tells you whether that's actually true.
 [![node](https://img.shields.io/badge/node-%3E%3D18-brightgreen)](https://nodejs.org)
 [![CI](https://img.shields.io/badge/tests-passing-brightgreen)](#)
 
+<br>
+
+<img src="examples/demo/groundtruth-demo.gif" alt="An AI agent claims it finished the task and all tests pass; groundtruth runs the checks and busts six overclaims." width="820">
+
 </div>
 
-<!-- TODO(demo): replace with the split-screen GIF — Claude Code says "Done" on the left, groundtruth busts it on the right. -->
+<details>
+<summary>Same thing, as text</summary>
 
 ```console
 $ npx groundtruth
@@ -48,6 +53,8 @@ The agent said:
   ────────────────────────────────────────────────
   VERDICT: 6 overclaim(s) — DO NOT MERGE. ✗
 ```
+
+</details>
 
 Try it yourself right now: **`bash examples/demo/run.sh`**
 
