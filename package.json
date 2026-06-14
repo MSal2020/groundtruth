@@ -1,0 +1,54 @@
+{
+  "name": "groundtruth",
+  "version": "0.1.0",
+  "description": "Catch your AI coding agent when it lies. groundtruth independently re-derives reality and checks it against what the agent claimed — it runs your tests, reads the diff, and gives you the receipts.",
+  "type": "module",
+  "bin": {
+    "groundtruth": "dist/cli.js",
+    "gt": "dist/cli.js"
+  },
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "dev": "tsx src/cli.ts",
+    "test": "node --import tsx --test test/*.test.ts",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [
+    "ai",
+    "agent",
+    "claude-code",
+    "cursor",
+    "copilot",
+    "verification",
+    "hallucination",
+    "slopsquatting",
+    "reward-hacking",
+    "code-review",
+    "llm",
+    "guardrail",
+    "ground-truth"
+  ],
+  "author": "Muhammad Salmaan Ahmed Nusrath",
+  "license": "MIT",
+  "engines": {
+    "node": ">=18"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.0",
+    "tsx": "^4.16.0",
+    "typescript": "^5.5.0"
+  }
+}
