@@ -15,6 +15,7 @@ import { renderMarkdown } from "./report/markdown.js";
 import { runHook } from "./integrations/hook.js";
 import { installClaudeHook } from "./integrations/install.js";
 import { color } from "./util/color.js";
+import { readStdin } from "./util/stdin.js";
 
 function version(): string {
   try {
@@ -115,17 +116,6 @@ function parseArgs(argv: string[]): Args {
   return a;
 }
 
-function readPipedStdin(): Promise<string> {
-  return new Promise((resolve) => {
-    if (process.stdin.isTTY) return resolve("");
-    let data = "";
-    process.stdin.setEncoding("utf8");
-    process.stdin.on("data", (c) => (data += c));
-    process.stdin.on("end", () => resolve(data));
-    process.stdin.on("error", () => resolve(data));
-  });
-}
-
 async function gatherClaims(args: Args): Promise<Claim[]> {
   const texts: string[] = [...args.claims];
 
@@ -144,7 +134,7 @@ async function gatherClaims(args: Args): Promise<Claim[]> {
       } catch {/* ignore */}
     }
   }
-  const piped = await readPipedStdin();
+  const piped = await readStdin();
   if (piped.trim()) texts.push(piped);
 
   return texts.flatMap((t) => extractClaims(t));

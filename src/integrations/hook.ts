@@ -14,6 +14,7 @@ import { parseTranscript } from "../claims/transcript.js";
 import { extractClaims } from "../claims/extract.js";
 import { verify } from "../verify.js";
 import { renderMarkdown } from "../report/markdown.js";
+import { readStdin } from "../util/stdin.js";
 
 interface HookInput {
   transcript_path?: string;
@@ -22,21 +23,10 @@ interface HookInput {
   stop_hook_active?: boolean;
 }
 
-function readStdin(): Promise<string> {
-  return new Promise((resolve) => {
-    let data = "";
-    if (process.stdin.isTTY) return resolve("");
-    process.stdin.setEncoding("utf8");
-    process.stdin.on("data", (c) => (data += c));
-    process.stdin.on("end", () => resolve(data));
-    process.stdin.on("error", () => resolve(data));
-  });
-}
-
 export async function runHook(): Promise<number> {
   let input: HookInput = {};
   try {
-    const raw = await readStdin();
+    const raw = await readStdin(2000);
     if (raw.trim()) input = JSON.parse(raw);
   } catch {
     return 0; // fail open: never wedge the agent on our own parse error

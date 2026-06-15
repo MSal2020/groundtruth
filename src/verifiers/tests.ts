@@ -39,17 +39,21 @@ function detectRunner(cwd: string, override?: string): Runner | null {
   return null;
 }
 
-function parseCounts(output: string): { passed?: number; failed?: number } {
-  // vitest: "Tests  3 failed | 11 passed (14)"
-  let m = /Tests\s+(?:(\d+)\s+failed\s*\|\s*)?(\d+)\s+passed/i.exec(output);
-  if (m) return { failed: m[1] ? +m[1] : 0, passed: +m[2]! };
-  // jest: "Tests:  3 failed, 11 passed, 14 total"
-  m = /Tests?:\s+(?:(\d+)\s+failed,\s*)?(?:\d+\s+skipped,\s*)?(\d+)\s+passed/i.exec(output);
-  if (m) return { failed: m[1] ? +m[1] : 0, passed: +m[2]! };
-  // node:test TAP summary
+export function parseCounts(output: string): { passed?: number; failed?: number } {
+  // node:test TAP summary (checked first; its "# tests" line resembles others)
   const passM = /^#\s*pass\s+(\d+)/im.exec(output);
   const failM = /^#\s*fail\s+(\d+)/im.exec(output);
   if (passM || failM) return { passed: passM ? +passM[1]! : 0, failed: failM ? +failM[1]! : 0 };
+
+  // vitest ("Tests  3 failed | 11 passed (14)") and jest ("Tests: 3 failed,
+  // 11 passed, 14 total") — handle all-pass / all-fail / mixed by reading the
+  // numbers out of the single "Tests" summary segment.
+  const seg = /\bTests:?\s+([^\n]*)/i.exec(output);
+  if (seg) {
+    const f = /(\d+)\s+failed/i.exec(seg[1]!);
+    const p = /(\d+)\s+passed/i.exec(seg[1]!);
+    if (f || p) return { failed: f ? +f[1]! : 0, passed: p ? +p[1]! : 0 };
+  }
   return {};
 }
 
@@ -83,7 +87,10 @@ export const testsVerifier: Verifier = {
       env: { ...process.env, CI: "1", FORCE_COLOR: "0" },
     });
 
-    const output = `${res.stdout ?? ""}\n${res.stderr ?? ""}`;
+    // Strip ANSI so counts parse and evidence is readable even when a runner
+    // forces color (vitest/jest sometimes ignore FORCE_COLOR=0).
+    const raw = `${res.stdout ?? ""}\n${res.stderr ?? ""}`;
+    const output = raw.replace(/\[[0-9;]*[a-zA-Z]/g, "");
     const counts = parseCounts(output);
     const passed = res.status === 0;
 
