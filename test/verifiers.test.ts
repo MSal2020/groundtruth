@@ -32,6 +32,20 @@ test("harness: an aliased skip (t.skip) without a claim is only a warning", asyn
   assert.match(receipts[0]!.title, /skipped test/);
 });
 
+test("harness: .only with a 'tests pass' claim is a failure", async () => {
+  const diff = [diffOf("test/e.test.js", [`test.only("x", () => {})`])];
+  const claims: Claim[] = [{ type: "tests", text: "all tests pass" }];
+  const receipts = await harnessVerifier.run({ cwd: CWD, claims, diff });
+  assert.equal(receipts[0]!.status, "failed");
+  assert.match(receipts[0]!.title, /focused/);
+});
+
+test("harness: .only without a claim is only a warning", async () => {
+  const diff = [diffOf("test/e.test.js", [`test.only("x", () => {})`])];
+  const receipts = await harnessVerifier.run({ cwd: CWD, claims: [], diff });
+  assert.equal(receipts[0]!.status, "warning");
+});
+
 test("harness: exit(0) inside a test is always a failure", async () => {
   const diff = [diffOf("test/b_test.py", ["    sys.exit(0)"])];
   const receipts = await harnessVerifier.run({ cwd: CWD, claims: [], diff });
@@ -73,6 +87,13 @@ test("stubs: a TODO surfaces as a warning once the agent claims it's done", asyn
   const claims: Claim[] = [{ type: "done", text: "all done, ready to merge" }];
   const receipts = await stubsVerifier.run({ cwd: CWD, claims, diff });
   assert.equal(receipts[0]!.status, "warning");
+});
+
+test("stubs: a TODO contradicting a 'no placeholders' claim is a failure", async () => {
+  const diff = [diffOf("src/x.ts", ["// TODO: handle the edge case"])];
+  const claims: Claim[] = [{ type: "no-placeholders", text: "no TODOs left" }];
+  const receipts = await stubsVerifier.run({ cwd: CWD, claims, diff });
+  assert.equal(receipts[0]!.status, "failed");
 });
 
 test("claims verifier busts 'added tests' when no test case is present", async () => {

@@ -58,22 +58,20 @@ export const stubsVerifier: Verifier = {
       }
     }
 
-    const hasCompletionClaim = opts.claims.some(
-      (c) => c.type === "done" || c.type === "no-placeholders"
-    );
+    // "No placeholders left" is a checkable promise; "done" is softer.
+    const hasNoPlaceholders = opts.claims.some((c) => c.type === "no-placeholders");
+    const hasDone = opts.claims.some((c) => c.type === "done");
 
     const lines = addedLines(opts.diff, (p) => isCodeFile(p) && !isTestFile(p));
     const failedFiles = new Set<string>(); // one hard failure per claimed file
-    const seenWarnings = new Set<string>(); // dedupe warnings by file+label
+    const seen = new Set<string>(); // dedupe by file+label
 
     for (const ln of lines) {
       for (const rule of RULES) {
         if (!rule.re.test(ln.text)) continue;
         const claim = fileClaim.get(ln.file);
 
-        // Suppress noisy placeholders unless the agent claimed completion.
-        if (!claim && rule.noisy && !hasCompletionClaim) break;
-
+        // A placeholder on a symbol the agent claimed to implement = hard fail.
         if (claim) {
           if (failedFiles.has(ln.file)) break; // already reported this file
           failedFiles.add(ln.file);
@@ -86,19 +84,30 @@ export const stubsVerifier: Verifier = {
             location: `${ln.file}:${ln.line}`,
             claim,
           });
-        } else {
-          const key = `${ln.file}:${rule.label}`;
-          if (seenWarnings.has(key)) break;
-          seenWarnings.add(key);
-          receipts.push({
-            status: "warning",
-            verifier: "stubs",
-            title: `placeholder left in diff: ${rule.label}`,
-            detail: `${rule.label} added in this change.`,
-            evidence: truncate(ln.text, 160),
-            location: `${ln.file}:${ln.line}`,
-          });
+          break;
         }
+
+        // Decide whether to surface an unclaimed placeholder, and how loudly.
+        let status: "failed" | "warning";
+        if (hasNoPlaceholders)
+          status = "failed"; // directly contradicts "no placeholders left"
+        else if (!rule.noisy)
+          status = "warning"; // a real stub (throws "not implemented") is always worth a note
+        else if (hasDone)
+          status = "warning"; // a bare TODO matters once the agent says it's done
+        else break; // noisy + no completion claim -> stay quiet
+
+        const key = `${ln.file}:${rule.label}`;
+        if (seen.has(key)) break;
+        seen.add(key);
+        receipts.push({
+          status,
+          verifier: "stubs",
+          title: status === "failed" ? `placeholder despite "no placeholders" claim: ${rule.label}` : `placeholder left in diff: ${rule.label}`,
+          detail: `${rule.label} added in this change.`,
+          evidence: truncate(ln.text, 160),
+          location: `${ln.file}:${ln.line}`,
+        });
         break;
       }
     }

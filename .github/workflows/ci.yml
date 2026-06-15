@@ -22,3 +22,19 @@ jobs:
       - run: npm test
       - name: groundtruth verifies itself
         run: node dist/cli.js --claim "tests pass and it compiles" --offline
+
+  eval:
+    name: eval (precision/recall must stay 100%)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      # Exits non-zero if any corpus case regresses (FP or FN). The dep cases
+      # hit the npm registry; packageExists() retries transient failures.
+      - name: Run evaluation corpus
+        run: node eval/run.mjs

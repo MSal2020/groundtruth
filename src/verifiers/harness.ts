@@ -24,7 +24,7 @@ const RULES: Rule[] = [
   { re: /\bpytest\.skip\s*\(/, label: "pytest.skip()", severity: "failed", claimSensitive: true },
   { re: /\bunittest\.skip\b/, label: "unittest skip", severity: "failed", claimSensitive: true },
   { re: /\bt\.Skip\s*\(/, label: "go t.Skip()", severity: "failed", claimSensitive: true },
-  { re: /\.only\s*\(/, label: "focused test (hides the rest of the suite)", severity: "warning" },
+  { re: /\.only\s*\(/, label: "focused test (hides the rest of the suite)", severity: "failed", claimSensitive: true },
   // These have no legitimate use in a test and stay hard failures.
   { re: /\b(?:sys\.exit|os\.\_?exit)\s*\(\s*0\s*\)/, label: "exit(0) inside a test (harness escape)", severity: "failed" },
   { re: /\bprocess\.exit\s*\(\s*0\s*\)/, label: "process.exit(0) inside a test (harness escape)", severity: "failed" },

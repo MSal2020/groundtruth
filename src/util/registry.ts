@@ -64,7 +64,13 @@ export async function packageExists(
 ): Promise<RegistryResult> {
   const cached = cache.get(name);
   if (cached) return cached;
-  const result = await fetchStatus(name, timeoutMs);
+  // Retry only on inconclusive (network) results so a transient blip doesn't
+  // flip a real hallucination into "unknown".
+  let result: RegistryResult = "unknown";
+  for (let attempt = 0; attempt < 3; attempt++) {
+    result = await fetchStatus(name, timeoutMs);
+    if (result !== "unknown") break;
+  }
   cache.set(name, result);
   return result;
 }

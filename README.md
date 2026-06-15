@@ -143,21 +143,23 @@ When the agent stops, `groundtruth` verifies its claims. If they don't hold, it 
 ## Does it actually work?
 
 A verifier that cries wolf is worse than useless, so groundtruth ships with an
-evaluation corpus of real scenarios — overclaims it must catch *and* honest
-changes it must leave alone (path aliases, `workspace:` packages, `#` subpath
-imports, legitimately skipped tests, real refactors).
+evaluation corpus of real scenarios — overclaims it must catch (across JS/TS,
+Python, and Go) *and* honest changes it must leave alone (path aliases,
+`workspace:` packages, `#` subpath imports, private scoped packages, legitimately
+skipped tests, real refactors, TODOs in docs).
 
 ```
 $ npm run eval
-  lying caught (TP):    9
+  lying caught (TP):    18
   lies missed  (FN):    0
-  honest ok    (TN):    11
+  honest ok    (TN):    20
   false alarms (FP):    0   <- false positives (credibility killers)
   precision: 100.0%   recall: 100.0%   F1: 100.0%
 ```
 
-Run it yourself with `npm run eval`. Found a lie it misses or an honest change it
-flags? That's the most valuable issue you can open — see the templates.
+This runs in CI on every PR and **must stay at 100%** to merge. Run it yourself
+with `npm run eval`. Found a lie it misses or an honest change it flags? That's
+the most valuable issue you can open — see the templates.
 
 ## Roadmap
 
