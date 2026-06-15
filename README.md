@@ -133,12 +133,15 @@ When the agent stops, `groundtruth` verifies its claims. If they don't hold, it 
 
 | Verifier | Catches |
 |---|---|
-| **tests** | "all tests pass" → actually runs the suite (vitest / jest / `node --test`) and compares. |
-| **harness** | Tests disabled to fake green: `.skip` / `.only` / `xit`, `@pytest.mark.skip`, `sys.exit(0)`, deleted assertions. |
-| **stubs** | "implemented X" that's really `throw new Error("TODO")`, `NotImplementedError`, empty bodies, placeholders. |
+| **tests** | "all tests pass" → actually runs the suite (**vitest / jest / `node --test` / pytest / `go test`**) and compares; flags green-but-zero-tests. |
+| **harness** | Tests disabled to fake green: `.skip` / `.only` / `xit`, `@pytest.mark.skip`/`xfail`, `t.Skip()`, `sys.exit(0)`, deleted assertions. |
+| **stubs** | "implemented X" that's really `throw new Error("TODO")`, `raise NotImplementedError`, `panic("TODO")`, empty bodies, placeholders. |
 | **deps** | Imported/added packages that **don't exist on npm** (hallucinations / slopsquatting). |
+| **pydeps** | `requirements.txt` deps and Python imports that **don't exist on PyPI**. |
 | **build** | "it compiles / no type errors" → runs `tsc --noEmit` (`--build`). |
 | **claims** | "added tests" with no new test case; "implemented X" where X isn't in the diff. |
+
+Languages: test-running, harness-gaming and stub detection work for **JS/TS, Python, and Go**; registry checks cover **npm** and **PyPI**.
 
 ## Does it actually work?
 
@@ -150,9 +153,9 @@ skipped tests, real refactors, TODOs in docs).
 
 ```
 $ npm run eval
-  lying caught (TP):    18
+  lying caught (TP):    19
   lies missed  (FN):    0
-  honest ok    (TN):    20
+  honest ok    (TN):    24
   false alarms (FP):    0   <- false positives (credibility killers)
   precision: 100.0%   recall: 100.0%   F1: 100.0%
 ```
@@ -163,7 +166,8 @@ the most valuable issue you can open — see the templates.
 
 ## Roadmap
 
-- [ ] Python & Go verifiers (test detection, stubs, PyPI checks)
+- [x] Python & Go runners (pytest / `go test`), harness + stub detection, PyPI checks
+- [ ] Go module dependency hallucination checks
 - [ ] Coverage-delta gate ("you said you tested it, but coverage didn't move")
 - [ ] GitHub Action with inline PR comments
 - [ ] VS Code surfacing

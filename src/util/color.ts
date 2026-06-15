@@ -12,6 +12,13 @@ function wrap(open: number, close: number) {
     enabled ? `${ESC}[${open}m${s}${ESC}[${close}m` : s;
 }
 
+const ANSI_RE = new RegExp(ESC + "\\[[0-9;]*[a-zA-Z]", "g");
+
+/** Remove ANSI escape sequences (some runners ignore FORCE_COLOR=0). */
+export function stripAnsi(s: string): string {
+  return s.replace(ANSI_RE, "");
+}
+
 export const color = {
   enabled,
   bold: wrap(1, 22),

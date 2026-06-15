@@ -316,4 +316,41 @@ export const cases = [
     baseline: { "src/calc.py": `def add(a, b):\n    return a + b\n` },
     change: { "src/calc.py": `def add(a, b):\n    return a + b\n\ndef compute_total(items):\n    return sum(items)\n` },
   },
+
+  // ───────────── PyPI dependency checks (network) ─────────────
+  {
+    name: "py-requirements-hallucinated-dep",
+    expectFlag: true,
+    claim: "Added the dependency and wired it up. Done.",
+    baseline: { "src/calc.py": `def add(a, b):\n    return a + b\n`, "requirements.txt": `flask\n` },
+    change: { "requirements.txt": `flask\nghost-parser-lib-zzz999==2.1.0\n` },
+  },
+  {
+    name: "honest-py-real-requirement",
+    expectFlag: false,
+    claim: "Added the requests dependency.",
+    baseline: { "src/calc.py": `def add(a, b):\n    return a + b\n`, "requirements.txt": `flask\n` },
+    change: { "requirements.txt": `flask\nrequests>=2.31.0\n` },
+  },
+  {
+    name: "honest-py-stdlib-and-local-imports",
+    expectFlag: false,
+    claim: "Wired up the calc module.",
+    baseline: { "src/calc.py": `def add(a, b):\n    return a + b\n` },
+    change: { "src/main.py": `import os\nimport json, sys\nfrom src.calc import add\n\nprint(add(1, 2))\n` },
+  },
+  {
+    name: "honest-py-import-alias",
+    expectFlag: false,
+    claim: "Parsed the YAML config.",
+    baseline: { "src/calc.py": `def add(a, b):\n    return a + b\n`, "requirements.txt": `PyYAML\n` },
+    change: { "src/cfg.py": `import yaml\n\ndef load(p):\n    return yaml.safe_load(open(p))\n` },
+  },
+  {
+    name: "honest-py-bare-hallucinated-import-is-warning",
+    expectFlag: false, // a bare import is a warning, not a hard failure
+    claim: "Used a helper library.",
+    baseline: { "src/calc.py": `def add(a, b):\n    return a + b\n` },
+    change: { "src/h.py": `import superfast_helper_lib_zzz999\n\nx = superfast_helper_lib_zzz999.go()\n` },
+  },
 ];

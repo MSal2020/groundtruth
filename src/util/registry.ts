@@ -1,4 +1,4 @@
-// Checks whether a package name actually exists on the npm registry.
+// Checks whether a package name actually exists on a public registry.
 // Used to catch hallucinated / slopsquatted dependencies an agent invented.
 
 import https from "node:https";
@@ -39,12 +39,10 @@ export function packageNameFromSpecifier(spec: string): string | null {
   return root || null;
 }
 
-function fetchStatus(name: string, timeoutMs: number): Promise<RegistryResult> {
+function fetchStatus(url: string, timeoutMs: number): Promise<RegistryResult> {
   return new Promise((resolve) => {
-    const url = `https://registry.npmjs.org/${encodeURIComponent(name).replace("%40", "@")}`;
     const req = https.get(url, { timeout: timeoutMs }, (res) => {
-      // Drain so the socket can be reused/closed.
-      res.resume();
+      res.resume(); // drain so the socket can close
       const code = res.statusCode ?? 0;
       if (code === 200) resolve("exists");
       else if (code === 404) resolve("missing");
@@ -58,19 +56,32 @@ function fetchStatus(name: string, timeoutMs: number): Promise<RegistryResult> {
   });
 }
 
-export async function packageExists(
-  name: string,
-  timeoutMs = 4000
+async function checkWithRetry(
+  cacheKey: string,
+  url: string,
+  timeoutMs: number
 ): Promise<RegistryResult> {
-  const cached = cache.get(name);
+  const cached = cache.get(cacheKey);
   if (cached) return cached;
   // Retry only on inconclusive (network) results so a transient blip doesn't
   // flip a real hallucination into "unknown".
   let result: RegistryResult = "unknown";
   for (let attempt = 0; attempt < 3; attempt++) {
-    result = await fetchStatus(name, timeoutMs);
+    result = await fetchStatus(url, timeoutMs);
     if (result !== "unknown") break;
   }
-  cache.set(name, result);
+  cache.set(cacheKey, result);
   return result;
+}
+
+/** Does this package exist on the npm registry? */
+export function packageExists(name: string, timeoutMs = 4000): Promise<RegistryResult> {
+  const url = `https://registry.npmjs.org/${encodeURIComponent(name).replace("%40", "@")}`;
+  return checkWithRetry(`npm:${name}`, url, timeoutMs);
+}
+
+/** Does this distribution exist on PyPI? */
+export function pypiExists(name: string, timeoutMs = 4000): Promise<RegistryResult> {
+  const url = `https://pypi.org/pypi/${encodeURIComponent(name)}/json`;
+  return checkWithRetry(`pypi:${name}`, url, timeoutMs);
 }

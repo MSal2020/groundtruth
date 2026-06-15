@@ -3,6 +3,22 @@
 All notable changes to this project are documented here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/).
 
+## [Unreleased]
+
+### Added
+- **Multi-language test runners** — the `tests` verifier now detects and runs
+  **pytest** (`python -m pytest`) and **`go test ./...`** in addition to npm
+  (vitest / jest / `node --test`). Missing toolchains are reported as
+  `unchecked`, never as a failing suite.
+- **PyPI dependency checks** (`pydeps`) — `requirements.txt` deps that don't
+  exist on PyPI are hard failures; bare Python imports are warnings
+  (stdlib/local/alias-aware, since import names ≠ distribution names).
+- Skip-guarded pytest/go E2E tests; CI installs pytest and runs both.
+
+### Changed
+- Eval corpus expanded to 43 cases (19 lying + 24 honest), still 100%
+  precision/recall, gated in CI.
+
 ## [0.1.0] — 2026-06-14
 
 First release. Catch your AI coding agent when it lies.

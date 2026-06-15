@@ -2,10 +2,14 @@ import { spawnSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import type { Receipt, Verifier, VerifyOptions } from "../types.js";
+import { stripAnsi } from "../util/color.js";
 
 const PLACEHOLDER_TEST = /no test specified/i;
 
+type Ecosystem = "node" | "python" | "go";
+
 interface Runner {
+  ecosystem: Ecosystem;
   cmd: string;
   args: string[];
   label: string;
@@ -17,11 +21,15 @@ function detectPackageManager(cwd: string): "pnpm" | "yarn" | "npm" {
   return "npm";
 }
 
+const PY_MARKERS = ["pyproject.toml", "setup.py", "setup.cfg", "pytest.ini", "tox.ini", "conftest.py"];
+
 function detectRunner(cwd: string, override?: string): Runner | null {
   if (override) {
     const parts = override.split(" ").filter(Boolean);
-    return { cmd: parts[0]!, args: parts.slice(1), label: override };
+    return { ecosystem: "node", cmd: parts[0]!, args: parts.slice(1), label: override };
   }
+
+  // Node: a real `test` script.
   const pkgPath = path.join(cwd, "package.json");
   if (existsSync(pkgPath)) {
     try {
@@ -30,24 +38,40 @@ function detectRunner(cwd: string, override?: string): Runner | null {
       if (typeof testScript === "string" && !PLACEHOLDER_TEST.test(testScript)) {
         const pm = detectPackageManager(cwd);
         const args = pm === "npm" ? ["test", "--silent"] : ["test"];
-        return { cmd: pm, args, label: `${pm} test` };
+        return { ecosystem: "node", cmd: pm, args, label: `${pm} test` };
       }
     } catch {
       /* unreadable package.json */
     }
   }
+
+  // Python: a pytest-ish project.
+  if (PY_MARKERS.some((m) => existsSync(path.join(cwd, m)))) {
+    return { ecosystem: "python", cmd: "python3", args: ["-m", "pytest", "-q"], label: "pytest" };
+  }
+
+  // Go modules.
+  if (existsSync(path.join(cwd, "go.mod"))) {
+    return { ecosystem: "go", cmd: "go", args: ["test", "./..."], label: "go test ./..." };
+  }
+
   return null;
 }
 
-export function parseCounts(output: string): { passed?: number; failed?: number } {
+interface Counts {
+  passed?: number;
+  failed?: number;
+  noTests?: boolean;
+}
+
+export function parseCounts(output: string): Counts {
   // node:test TAP summary (checked first; its "# tests" line resembles others)
   const passM = /^#\s*pass\s+(\d+)/im.exec(output);
   const failM = /^#\s*fail\s+(\d+)/im.exec(output);
   if (passM || failM) return { passed: passM ? +passM[1]! : 0, failed: failM ? +failM[1]! : 0 };
 
   // vitest ("Tests  3 failed | 11 passed (14)") and jest ("Tests: 3 failed,
-  // 11 passed, 14 total") — handle all-pass / all-fail / mixed by reading the
-  // numbers out of the single "Tests" summary segment.
+  // 11 passed, 14 total") — read the numbers out of the "Tests" summary segment.
   const seg = /\bTests:?\s+([^\n]*)/i.exec(output);
   if (seg) {
     const f = /(\d+)\s+failed/i.exec(seg[1]!);
@@ -55,6 +79,33 @@ export function parseCounts(output: string): { passed?: number; failed?: number 
     if (f || p) return { failed: f ? +f[1]! : 0, passed: p ? +p[1]! : 0 };
   }
   return {};
+}
+
+export function parsePytestCounts(output: string): Counts {
+  if (/no tests ran|collected 0 items/i.test(output)) return { noTests: true, passed: 0, failed: 0 };
+  const f = /(\d+)\s+failed/i.exec(output);
+  const e = /(\d+)\s+error/i.exec(output);
+  const p = /(\d+)\s+passed/i.exec(output);
+  if (f || p || e) {
+    return { failed: (f ? +f[1]! : 0) + (e ? +e[1]! : 0), passed: p ? +p[1]! : 0 };
+  }
+  return {};
+}
+
+export function parseGoCounts(output: string): Counts {
+  const failed = (output.match(/^--- FAIL:/gm) ?? []).length;
+  const passed = (output.match(/^--- PASS:/gm) ?? []).length; // only with -v
+  const noTests =
+    /\[no test files\]/.test(output) && !/^ok\s/m.test(output) && !/--- FAIL/.test(output);
+  if (noTests) return { noTests: true, passed: 0, failed: 0 };
+  if (failed || passed) return { failed, passed };
+  return {};
+}
+
+function parse(ecosystem: Ecosystem, output: string): Counts {
+  if (ecosystem === "python") return parsePytestCounts(output);
+  if (ecosystem === "go") return parseGoCounts(output);
+  return parseCounts(output);
 }
 
 export const testsVerifier: Verifier = {
@@ -71,7 +122,7 @@ export const testsVerifier: Verifier = {
             status: "unchecked",
             verifier: "tests",
             title: "no test runner found",
-            detail: `Agent claimed "${claim.text}" but no runnable test script was detected.`,
+            detail: `Agent claimed "${claim.text}" but no runnable test suite (npm/pytest/go) was detected.`,
             claim,
           },
         ];
@@ -87,54 +138,63 @@ export const testsVerifier: Verifier = {
       env: { ...process.env, CI: "1", FORCE_COLOR: "0" },
     });
 
-    // Strip ANSI so counts parse and evidence is readable even when a runner
-    // forces color (vitest/jest sometimes ignore FORCE_COLOR=0).
-    const raw = `${res.stdout ?? ""}\n${res.stderr ?? ""}`;
-    const output = raw.replace(/\[[0-9;]*[a-zA-Z]/g, "");
-    const counts = parseCounts(output);
-    const passed = res.status === 0;
+    const output = stripAnsi(`${res.stdout ?? ""}\n${res.stderr ?? ""}`);
 
-    if (res.error) {
-      return [
-        {
-          status: "unchecked",
-          verifier: "tests",
-          title: "could not run tests",
-          detail: `Failed to execute \`${runner.label}\`: ${res.error.message}`,
-          ...(claim ? { claim } : {}),
-        },
-      ];
+    // Tool not installed — report as unchecked, never as a failing suite.
+    const toolMissing =
+      !!res.error ||
+      (runner.ecosystem === "python" && /No module named pytest|No module named '?pytest/i.test(output));
+    if (toolMissing) {
+      return claim
+        ? [
+            {
+              status: "unchecked",
+              verifier: "tests",
+              title: `could not run ${runner.label}`,
+              detail:
+                runner.ecosystem === "python"
+                  ? "pytest is not installed in this environment, so the claim couldn't be verified."
+                  : `Could not execute \`${runner.label}\` (${res.error?.message ?? "missing toolchain"}).`,
+              claim,
+            },
+          ]
+        : [];
     }
+
+    const counts = parse(runner.ecosystem, output);
+    const noTests = counts.noTests || (runner.ecosystem === "python" && res.status === 5);
+    const passed = res.status === 0;
 
     const allLines = output.split("\n").filter(Boolean);
     const signal = allLines.filter((l) =>
-      /\b(not ok|fail|failed|✗|✖|×|assert|expected|received|# fail|FAIL )\b/i.test(l)
+      /\b(not ok|fail|failed|✗|✖|×|assert|expected|received|# fail|FAIL |Error)\b/i.test(l)
     );
     const tail = (signal.length ? signal : allLines).slice(0, 10).join("\n");
 
+    if (noTests) {
+      return claim
+        ? [
+            {
+              status: "warning",
+              verifier: "tests",
+              title: `"${claim.text}" — but the suite ran 0 tests`,
+              detail: `Ran \`${runner.label}\`: no tests actually executed (all skipped, or none found).`,
+              claim,
+            },
+          ]
+        : [];
+    }
+
     if (passed) {
-      // A green suite that ran zero tests is a classic way to fake "tests pass"
-      // (e.g. skipping the only test).
-      if (claim && counts.passed === 0) {
-        return [
-          {
-            status: "warning",
-            verifier: "tests",
-            title: `"${claim.text}" — but the suite ran 0 tests`,
-            detail: `Ran \`${runner.label}\`: exit code 0, but no tests actually executed (all skipped or none found).`,
-            evidence: tail,
-            claim,
-          },
-        ];
-      }
       return [
         {
           status: "verified",
           verifier: "tests",
           title: claim ? "tests pass — confirmed" : "test suite passes",
-          detail: counts.passed != null
-            ? `Ran \`${runner.label}\`: ${counts.passed} passed${counts.failed ? `, ${counts.failed} failed` : ""}.`
-            : `Ran \`${runner.label}\`: exit code 0.`,
+          detail:
+            counts.passed != null
+              ? `Ran \`${runner.label}\`: ${counts.passed} passed${counts.failed ? `, ${counts.failed} failed` : ""}.`
+              : `Ran \`${runner.label}\`: exit code 0.`,
           ...(claim ? { claim } : {}),
         },
       ];

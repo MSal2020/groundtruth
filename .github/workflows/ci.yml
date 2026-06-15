@@ -19,6 +19,11 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run build
+      # Make pytest available so the Python runner E2E runs (not skipped).
+      # Go is preinstalled on the runner, so the Go E2E runs too. Non-fatal:
+      # if either is unavailable the E2E test skips itself.
+      - name: Install pytest
+        run: python3 -m pip install --quiet pytest || true
       - run: npm test
       - name: groundtruth verifies itself
         run: node dist/cli.js --claim "tests pass and it compiles" --offline
