@@ -45,7 +45,8 @@ function fetchStatus(url: string, timeoutMs: number): Promise<RegistryResult> {
       res.resume(); // drain so the socket can close
       const code = res.statusCode ?? 0;
       if (code === 200) resolve("exists");
-      else if (code === 404) resolve("missing");
+      // proxy.golang.org answers 404/410 for modules that don't exist.
+      else if (code === 404 || code === 410) resolve("missing");
       else resolve("unknown");
     });
     req.on("timeout", () => {
@@ -84,4 +85,15 @@ export function packageExists(name: string, timeoutMs = 4000): Promise<RegistryR
 export function pypiExists(name: string, timeoutMs = 4000): Promise<RegistryResult> {
   const url = `https://pypi.org/pypi/${encodeURIComponent(name)}/json`;
   return checkWithRetry(`pypi:${name}`, url, timeoutMs);
+}
+
+/** Case-encode a module path per the Go module proxy protocol (M -> !m). */
+export function encodeGoModule(path: string): string {
+  return path.replace(/[A-Z]/g, (c) => "!" + c.toLowerCase());
+}
+
+/** Does this module exist on the Go module proxy? */
+export function goModuleExists(module: string, timeoutMs = 4000): Promise<RegistryResult> {
+  const url = `https://proxy.golang.org/${encodeGoModule(module)}/@latest`;
+  return checkWithRetry(`go:${module}`, url, timeoutMs);
 }

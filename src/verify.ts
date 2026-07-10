@@ -4,6 +4,7 @@ import { harnessVerifier } from "./verifiers/harness.js";
 import { stubsVerifier } from "./verifiers/stubs.js";
 import { depsVerifier } from "./verifiers/deps.js";
 import { pydepsVerifier } from "./verifiers/pydeps.js";
+import { godepsVerifier } from "./verifiers/godeps.js";
 import { buildVerifier } from "./verifiers/build.js";
 import { claimsVerifier } from "./verifiers/claims.js";
 
@@ -13,6 +14,7 @@ export const VERIFIERS: Verifier[] = [
   stubsVerifier,
   depsVerifier,
   pydepsVerifier,
+  godepsVerifier,
   buildVerifier,
   claimsVerifier,
 ];

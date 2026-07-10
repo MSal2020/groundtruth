@@ -123,11 +123,29 @@ npx groundtruth init     # writes the Stop hook into .claude/settings.json
 When the agent stops, `groundtruth` verifies its claims. If they don't hold, it returns `{"decision":"block"}` with the receipts, and the agent keeps working.
 </details>
 
-### 3. CI gate
+### 3. CI gate — GitHub Action with PR receipts
+
 ```yaml
 # .github/workflows/groundtruth.yml
-- run: npx groundtruth --base origin/${{ github.base_ref }} --markdown
+name: groundtruth
+on: pull_request
+permissions:
+  contents: read
+  pull-requests: write   # for the sticky receipts comment
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: MSal2020/groundtruth@main
+        with:
+          claim: ${{ github.event.pull_request.body }}   # verify the PR description's claims
 ```
+
+The Action diffs against the PR base, runs the verifiers, fails the check on an
+overclaim, and posts (and keeps updated) a sticky PR comment with the receipts.
+Inputs: `claim`, `base`, `comment`, `fail-on-overclaim`. Or skip the Action and
+just run `npx groundtruth --base origin/main --markdown` anywhere.
 
 ## What it checks
 
@@ -137,11 +155,12 @@ When the agent stops, `groundtruth` verifies its claims. If they don't hold, it 
 | **harness** | Tests disabled to fake green: `.skip` / `.only` / `xit`, `@pytest.mark.skip`/`xfail`, `t.Skip()`, `sys.exit(0)`, deleted assertions. |
 | **stubs** | "implemented X" that's really `throw new Error("TODO")`, `raise NotImplementedError`, `panic("TODO")`, empty bodies, placeholders. |
 | **deps** | Imported/added packages that **don't exist on npm** (hallucinations / slopsquatting). |
-| **pydeps** | `requirements.txt` deps and Python imports that **don't exist on PyPI**. |
+| **pydeps** | `requirements.txt` / `pyproject.toml` deps and Python imports that **don't exist on PyPI**. |
+| **godeps** | `go.mod` requires and imports that **don't exist on the Go module proxy**. |
 | **build** | "it compiles / no type errors" → runs `tsc --noEmit` (`--build`). |
 | **claims** | "added tests" with no new test case; "implemented X" where X isn't in the diff. |
 
-Languages: test-running, harness-gaming and stub detection work for **JS/TS, Python, and Go**; registry checks cover **npm** and **PyPI**.
+Languages: test-running, harness-gaming and stub detection work for **JS/TS, Python, and Go**; registry checks cover **npm**, **PyPI**, and the **Go module proxy**.
 
 ## Does it actually work?
 
@@ -153,9 +172,9 @@ skipped tests, real refactors, TODOs in docs).
 
 ```
 $ npm run eval
-  lying caught (TP):    19
+  lying caught (TP):    21
   lies missed  (FN):    0
-  honest ok    (TN):    24
+  honest ok    (TN):    26
   false alarms (FP):    0   <- false positives (credibility killers)
   precision: 100.0%   recall: 100.0%   F1: 100.0%
 ```
@@ -167,9 +186,9 @@ the most valuable issue you can open — see the templates.
 ## Roadmap
 
 - [x] Python & Go runners (pytest / `go test`), harness + stub detection, PyPI checks
-- [ ] Go module dependency hallucination checks
+- [x] Go module dependency hallucination checks (Go module proxy)
+- [x] GitHub Action with sticky PR receipts
 - [ ] Coverage-delta gate ("you said you tested it, but coverage didn't move")
-- [ ] GitHub Action with inline PR comments
 - [ ] VS Code surfacing
 - [ ] Optional `--llm` claim extraction for free-form summaries
 - [ ] A gallery of caught lies

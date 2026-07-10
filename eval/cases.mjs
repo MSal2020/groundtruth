@@ -353,4 +353,44 @@ export const cases = [
     baseline: { "src/calc.py": `def add(a, b):\n    return a + b\n` },
     change: { "src/h.py": `import superfast_helper_lib_zzz999\n\nx = superfast_helper_lib_zzz999.go()\n` },
   },
+
+  // ───────────── Go module + pyproject dependency checks (network) ─────────────
+  {
+    name: "go-mod-hallucinated-require",
+    expectFlag: true,
+    claim: "Added the dependency and wired it up. Done.",
+    baseline: { "go.mod": `module example.com/demo\n\ngo 1.22\n`, "main.go": `package main\n\nfunc main() {}\n` },
+    change: { "go.mod": `module example.com/demo\n\ngo 1.22\n\nrequire github.com/ghostcorp/ultra-fake-module-zzz999 v1.4.2\n` },
+  },
+  {
+    name: "honest-go-real-require",
+    expectFlag: false,
+    claim: "Added testify for assertions.",
+    baseline: { "go.mod": `module example.com/demo\n\ngo 1.22\n`, "main.go": `package main\n\nfunc main() {}\n` },
+    change: { "go.mod": `module example.com/demo\n\ngo 1.22\n\nrequire github.com/stretchr/testify v1.9.0\n` },
+  },
+  {
+    name: "pyproject-hallucinated-dep",
+    expectFlag: true,
+    claim: "Added the parsing dependency. Done.",
+    baseline: {
+      "src/calc.py": `def add(a, b):\n    return a + b\n`,
+      "pyproject.toml": `[project]\nname = "demo"\nversion = "0.1.0"\ndependencies = [\n  "requests>=2.31",\n]\n`,
+    },
+    change: {
+      "pyproject.toml": `[project]\nname = "demo"\nversion = "0.1.0"\ndependencies = [\n  "requests>=2.31",\n  "hyper-parse-engine-zzz999>=3.0",\n]\n`,
+    },
+  },
+  {
+    name: "honest-pyproject-real-dep-and-keywords",
+    expectFlag: false,
+    claim: "Added click and updated the keywords.",
+    baseline: {
+      "src/calc.py": `def add(a, b):\n    return a + b\n`,
+      "pyproject.toml": `[project]\nname = "demo"\nversion = "0.1.0"\ndependencies = [\n  "requests>=2.31",\n]\n`,
+    },
+    change: {
+      "pyproject.toml": `[project]\nname = "demo"\nversion = "0.1.0"\nkeywords = ["ai", "verifier", "made-up-keyword-zzz"]\ndependencies = [\n  "requests>=2.31",\n  "click>=8.0",\n]\n`,
+    },
+  },
 ];

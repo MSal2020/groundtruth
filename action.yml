@@ -1,0 +1,88 @@
+name: "groundtruth"
+description: "Catch your AI coding agent when it lies — verify its claims against reality (runs tests, audits the diff, checks registries)."
+author: "Muhammad Salmaan Ahmed Nusrath"
+branding:
+  icon: "check-circle"
+  color: "red"
+
+inputs:
+  claim:
+    description: "The agent's claim to verify (e.g. the PR description). Optional — the diff battery runs regardless."
+    required: false
+    default: ""
+  base:
+    description: "Base ref to diff against. Defaults to the PR base branch."
+    required: false
+    default: ""
+  comment:
+    description: "Post/update a sticky PR comment with the receipts (needs pull-requests: write)."
+    required: false
+    default: "true"
+  fail-on-overclaim:
+    description: "Fail the job when overclaims are found."
+    required: false
+    default: "true"
+
+runs:
+  using: "composite"
+  steps:
+    - name: Build groundtruth
+      shell: bash
+      run: |
+        cd "${{ github.action_path }}"
+        npm ci --silent --no-audit --no-fund
+        npm run build --silent
+
+    - name: Run groundtruth
+      shell: bash
+      env:
+        GH_TOKEN: ${{ github.token }}
+        INPUT_CLAIM: ${{ inputs.claim }}
+        INPUT_BASE: ${{ inputs.base }}
+        INPUT_COMMENT: ${{ inputs.comment }}
+        INPUT_FAIL: ${{ inputs.fail-on-overclaim }}
+        PR_NUMBER: ${{ github.event.pull_request.number }}
+        BASE_REF: ${{ github.base_ref }}
+      run: |
+        set -u
+        GT="${{ github.action_path }}/dist/cli.js"
+
+        BASE="${INPUT_BASE:-}"
+        if [ -z "$BASE" ] && [ -n "${BASE_REF:-}" ]; then
+          git fetch --no-tags --depth=1 origin "$BASE_REF" 2>/dev/null || true
+          BASE="origin/$BASE_REF"
+        fi
+
+        ARGS=(--markdown)
+        [ -n "$BASE" ] && ARGS+=(--base "$BASE")
+        [ -n "$INPUT_CLAIM" ] && ARGS+=(--claim "$INPUT_CLAIM")
+
+        set +e
+        node "$GT" "${ARGS[@]}" < /dev/null > gt-report.md
+        STATUS=$?
+        set -e
+
+        {
+          echo '<!-- groundtruth-report -->'
+          cat gt-report.md
+        } > gt-comment.md
+
+        cat gt-report.md >> "$GITHUB_STEP_SUMMARY"
+
+        if [ "$INPUT_COMMENT" = "true" ] && [ -n "${PR_NUMBER:-}" ]; then
+          EXISTING=$(gh api "repos/${{ github.repository }}/issues/$PR_NUMBER/comments" \
+            --paginate -q '.[] | select(.body | contains("<!-- groundtruth-report -->")) | .id' \
+            2>/dev/null | head -1 || true)
+          if [ -n "$EXISTING" ]; then
+            gh api -X PATCH "repos/${{ github.repository }}/issues/comments/$EXISTING" \
+              -F body=@gt-comment.md > /dev/null || true
+          else
+            gh api "repos/${{ github.repository }}/issues/$PR_NUMBER/comments" \
+              -F body=@gt-comment.md > /dev/null || true
+          fi
+        fi
+
+        if [ "$INPUT_FAIL" = "true" ] && [ "$STATUS" -ne 0 ]; then
+          echo "groundtruth: overclaims detected (exit $STATUS)"
+          exit "$STATUS"
+        fi

@@ -1,7 +1,7 @@
 import { existsSync } from "node:fs";
 import path from "node:path";
 import type { Receipt, Verifier, VerifyOptions } from "../types.js";
-import { addedLines } from "./shared.js";
+import { addedLines, readFileSafe } from "./shared.js";
 import { pypiExists } from "../util/registry.js";
 
 // Catches hallucinated PyPI dependencies. Declared deps (requirements.txt) are
@@ -66,11 +66,48 @@ function isLocal(cwd: string, top: string, locals: Set<string>): boolean {
 interface Candidate {
   name: string;
   loc: string;
-  source: "requirements" | "import";
+  source: "requirements" | "pyproject" | "import";
 }
 
 const REQ_FILE = /(?:^|\/)requirements[^/]*\.txt$/;
+const PYPROJECT = /(?:^|\/)pyproject\.toml$/;
 const PY_FILE = /\.py$/;
+
+/** PEP 508 distribution name at the start of a requirement string. */
+function pep508Name(req: string): string | null {
+  const m = /^\s*([A-Za-z0-9][A-Za-z0-9._-]*)/.exec(req);
+  return m ? m[1]! : null;
+}
+
+/**
+ * Extract declared dependency names from pyproject.toml — only from real
+ * dependency arrays (`dependencies = [...]`, `[project.optional-dependencies]`,
+ * `[dependency-groups]`), never from keywords/classifiers, which are also
+ * quoted-string arrays and would false-positive a naive line scan.
+ */
+export function pyprojectDeclaredDeps(toml: string): Set<string> {
+  const names = new Set<string>();
+  const collect = (arrayBody: string) => {
+    for (const m of arrayBody.matchAll(/"((?:[^"\\]|\\.)*)"|'((?:[^'\\]|\\.)*)'/g)) {
+      const name = pep508Name(m[1] ?? m[2] ?? "");
+      if (name) names.add(name);
+    }
+  };
+
+  // `dependencies = [ ... ]` (project table, PEP 621)
+  for (const m of toml.matchAll(/^[ \t]*dependencies[ \t]*=[ \t]*\[([\s\S]*?)\]/gm)) {
+    collect(m[1]!);
+  }
+  // every array inside [project.optional-dependencies] / [dependency-groups]
+  for (const m of toml.matchAll(
+    /^\[(?:project\.optional-dependencies|dependency-groups)\]\s*\n([\s\S]*?)(?=^\[|\s*$(?![\s\S]))/gm
+  )) {
+    for (const arr of m[1]!.matchAll(/^[ \t]*[\w.-]+[ \t]*=[ \t]*\[([\s\S]*?)\]/gm)) {
+      collect(arr[1]!);
+    }
+  }
+  return names;
+}
 
 function collectCandidates(opts: VerifyOptions): Candidate[] {
   const found = new Map<string, Candidate>();
@@ -84,6 +121,26 @@ function collectCandidates(opts: VerifyOptions): Candidate[] {
     if (m) {
       const name = m[1]!;
       if (!found.has(`req:${name}`)) found.set(`req:${name}`, { name, loc: `${ln.file}:${ln.line}`, source: "requirements" });
+    }
+  }
+
+  // pyproject.toml: declared deps (parsed from real dependency arrays), scoped
+  // to names that appear on lines *added* in this diff.
+  const pyprojectAdded = addedLines(opts.diff, (p) => PYPROJECT.test(p));
+  if (pyprojectAdded.length) {
+    const pyprojectFile = opts.diff.find((f) => PYPROJECT.test(f.path))?.path ?? "pyproject.toml";
+    const toml = readFileSafe(opts.cwd, pyprojectFile);
+    if (toml) {
+      const declared = pyprojectDeclaredDeps(toml);
+      for (const name of declared) {
+        const hit = pyprojectAdded.find((l) => {
+          const n = pep508Name(/["']\s*([^"']+)/.exec(l.text)?.[1] ?? "");
+          return n === name;
+        });
+        if (hit && !found.has(`req:${name}`)) {
+          found.set(`req:${name}`, { name, loc: `${hit.file}:${hit.line}`, source: "pyproject" });
+        }
+      }
     }
   }
 
@@ -137,7 +194,7 @@ export const pydepsVerifier: Verifier = {
     const receipts: Receipt[] = [];
     for (const { c, result } of results) {
       if (result === "missing") {
-        const declared = c.source === "requirements";
+        const declared = c.source === "requirements" || c.source === "pyproject";
         receipts.push({
           status: declared ? "failed" : "warning",
           verifier: "pydeps",

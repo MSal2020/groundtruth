@@ -43,3 +43,24 @@ test("pydeps collects a non-stdlib third-party import", async () => {
   const receipts = await pydepsVerifier.run({ cwd: CWD, claims: [], diff, offline: true });
   assert.equal(receipts[0]!.status, "unchecked"); // would be a warning online
 });
+
+test("pyprojectDeclaredDeps reads dependency arrays but not keywords/classifiers", async () => {
+  const { pyprojectDeclaredDeps } = await import("../src/verifiers/pydeps.js");
+  const toml = `[project]
+name = "demo"
+keywords = ["ai", "agents", "totally-not-a-dep"]
+classifiers = ["Programming Language :: Python"]
+dependencies = [
+  "requests>=2.31",
+  'flask',
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8", "ruff"]
+
+[tool.other]
+things = ["not-a-dep-either"]
+`;
+  const deps = pyprojectDeclaredDeps(toml);
+  assert.deepEqual([...deps].sort(), ["flask", "pytest", "requests", "ruff"]);
+});

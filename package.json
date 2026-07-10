@@ -1,6 +1,6 @@
 {
   "name": "groundtruth",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Catch your AI coding agent when it lies. groundtruth independently re-derives reality and checks it against what the agent claimed — it runs your tests, reads the diff, and gives you the receipts.",
   "type": "module",
   "bin": {
