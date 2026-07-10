@@ -15,6 +15,7 @@ import { extractClaims } from "../claims/extract.js";
 import { verify } from "../verify.js";
 import { renderMarkdown } from "../report/markdown.js";
 import { readStdin } from "../util/stdin.js";
+import { appendCatch } from "./catchlog.js";
 
 interface HookInput {
   transcript_path?: string;
@@ -55,6 +56,18 @@ export async function runHook(): Promise<number> {
   } catch {
     return 0; // fail open
   }
+
+  appendCatch({
+    ts: new Date().toISOString(),
+    cwd,
+    result: verdict.ok ? "clean" : "blocked",
+    failed: verdict.failed,
+    warnings: verdict.warnings,
+    titles: verdict.receipts
+      .filter((r) => r.status === "failed")
+      .map((r) => r.title)
+      .slice(0, 10),
+  });
 
   if (verdict.ok) {
     // Allow the stop. Stay quiet so we don't clutter the session.

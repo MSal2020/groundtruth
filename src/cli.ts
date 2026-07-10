@@ -14,6 +14,7 @@ import { renderPretty } from "./report/pretty.js";
 import { renderMarkdown } from "./report/markdown.js";
 import { runHook } from "./integrations/hook.js";
 import { installClaudeHook } from "./integrations/install.js";
+import { readCatches, summarizeCatches } from "./integrations/catchlog.js";
 import { color } from "./util/color.js";
 import { readStdin } from "./util/stdin.js";
 
@@ -37,6 +38,7 @@ ${color.bold("Usage")}
   groundtruth [options]          Verify the current working tree
   groundtruth hook               Run as a Claude Code Stop hook (reads stdin)
   groundtruth init               Install the Claude Code Stop hook for this repo
+  groundtruth catches            Show what the hook has caught (local log only)
 
 ${color.bold("Claims")}
   --claim <text>                 A claim to check (repeatable)
@@ -201,6 +203,9 @@ async function main(): Promise<void> {
       process.exit(r.status === "error" ? 1 : 0);
       break;
     }
+    case "catches":
+      process.stdout.write(summarizeCatches(readCatches()) + "\n");
+      break;
     case "check":
       process.exit(await runCheck(args));
       break;
