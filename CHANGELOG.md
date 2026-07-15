@@ -3,6 +3,29 @@
 All notable changes to this project are documented here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/).
 
+## [Unreleased]
+
+### Added
+- **Monorepo reach** — the `tests` verifier now walks from each changed file to
+  the sub-project that owns it and runs *that* suite (e.g. `backend/`), instead
+  of only looking at the repo root. This was the #1 reason the tool stayed
+  silent on real projects run from the root.
+- `groundtruth catches` now records diff size, claim count, and which test
+  runners were in scope, so "clean" is never ambiguous (it distinguishes
+  "verified honest" from "nothing was actually run").
+
+### Changed
+- The Stop hook runs test suites only when the agent claims completion
+  (tests/done), keeping every intermediate stop fast. A manual `groundtruth`
+  run still audits tests (use `--no-tests` to skip).
+
+### Fixed
+- A missing test *runner* (un-installed sub-project) reports `unchecked`, but a
+  missing *application* module (a hallucinated import) correctly reads as a
+  failing suite instead of being masked.
+- Scrub `NODE_TEST_CONTEXT` / `PYTEST_CURRENT_TEST` when spawning a suite so a
+  nested runner executes standalone.
+
 ## [0.2.0] — 2026-06-15
 
 ### Added

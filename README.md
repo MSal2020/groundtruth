@@ -151,7 +151,7 @@ just run `npx groundtruth --base origin/main --markdown` anywhere.
 
 | Verifier | Catches |
 |---|---|
-| **tests** | "all tests pass" → actually runs the suite (**vitest / jest / `node --test` / pytest / `go test`**) and compares; flags green-but-zero-tests. |
+| **tests** | "all tests pass" → actually runs the suite (**vitest / jest / `node --test` / pytest / `go test`**) and compares; flags green-but-zero-tests. **Monorepo-aware**: runs the suite of the sub-project (`backend/`, …) the diff actually touched. |
 | **harness** | Tests disabled to fake green: `.skip` / `.only` / `xit`, `@pytest.mark.skip`/`xfail`, `t.Skip()`, `sys.exit(0)`, deleted assertions. |
 | **stubs** | "implemented X" that's really `throw new Error("TODO")`, `raise NotImplementedError`, `panic("TODO")`, empty bodies, placeholders. |
 | **deps** | Imported/added packages that **don't exist on npm** (hallucinations / slopsquatting). |

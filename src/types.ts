@@ -62,6 +62,8 @@ export interface VerifyOptions {
   diff: FileDiff[];
   /** Skip running the test suite. */
   noTests?: boolean;
+  /** Run the suite even without a completion claim (manual CLI audits). */
+  forceTests?: boolean;
   /** Skip the npm-registry dependency check. */
   offline?: boolean;
   /** Run `tsc --noEmit` even without an explicit build claim. */

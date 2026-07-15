@@ -156,6 +156,8 @@ async function runCheck(args: Args): Promise<number> {
     claims,
     diff,
     noTests: args.noTests,
+    // A manual `groundtruth` run audits tests regardless of claim wording.
+    forceTests: !args.noTests,
     offline: args.offline,
     build: args.build,
   });

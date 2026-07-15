@@ -381,6 +381,37 @@ export const cases = [
       "pyproject.toml": `[project]\nname = "demo"\nversion = "0.1.0"\ndependencies = [\n  "requests>=2.31",\n  "hyper-parse-engine-zzz999>=3.0",\n]\n`,
     },
   },
+  // ───────────── Monorepo reach: code lives in a sub-project ─────────────
+  {
+    // Run from the repo root, but the failing suite is in backend/ — the exact
+    // shape that made groundtruth silent during the real dogfood week.
+    name: "monorepo-subdir-failing-tests-claimed-pass",
+    expectFlag: true,
+    claim: "Implemented pay in the backend and all tests pass. Ready to merge.",
+    baseline: {
+      "README.md": "# monorepo\n",
+      "backend/package.json": `{ "name": "backend", "version": "1.0.0", "type": "commonjs", "scripts": { "test": "node --test" } }\n`,
+      "backend/src/pay.js": `function pay(o) { if (!o || !o.amount) throw new Error("amount required"); return o.amount * 2; }\nmodule.exports = { pay };\n`,
+      "backend/test/pay.test.js": `const test = require("node:test");\nconst assert = require("node:assert");\nconst { pay } = require("../src/pay");\ntest("doubles", () => { assert.strictEqual(pay({ amount: 5 }), 10); });\n`,
+    },
+    change: {
+      "backend/src/pay.js": `function pay(o) { return o.amount; } // regressed: no longer doubles\nmodule.exports = { pay };\n`,
+    },
+  },
+  {
+    name: "honest-monorepo-subdir-passing",
+    expectFlag: false,
+    claim: "Refactored pay in the backend; all tests still pass.",
+    baseline: {
+      "README.md": "# monorepo\n",
+      "backend/package.json": `{ "name": "backend", "version": "1.0.0", "type": "commonjs", "scripts": { "test": "node --test" } }\n`,
+      "backend/src/pay.js": `function pay(o) { if (!o || !o.amount) throw new Error("amount required"); return o.amount * 2; }\nmodule.exports = { pay };\n`,
+      "backend/test/pay.test.js": `const test = require("node:test");\nconst assert = require("node:assert");\nconst { pay } = require("../src/pay");\ntest("doubles", () => { assert.strictEqual(pay({ amount: 5 }), 10); });\n`,
+    },
+    change: {
+      "backend/src/pay.js": `function pay(o) {\n  if (!o || !o.amount) throw new Error("amount required");\n  const doubled = o.amount * 2;\n  return doubled;\n}\nmodule.exports = { pay };\n`,
+    },
+  },
   {
     name: "honest-pyproject-real-dep-and-keywords",
     expectFlag: false,

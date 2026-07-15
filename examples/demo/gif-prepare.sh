@@ -36,6 +36,9 @@ const { validateInput } = require("../src/validate");
 test("accepts a valid order", () => {
   assert.strictEqual(validateInput({ items: [{ sku: "A" }] }), true);
 });
+test("rejects an empty order", () => {
+  assert.throws(() => validateInput({ items: [] }));
+});
 JS
   git add -A && git commit -qm baseline
 
@@ -52,8 +55,11 @@ JS
 const test = require("node:test");
 const assert = require("node:assert");
 const { validateInput } = require("../src/validate");
-test.skip("accepts a valid order", () => {
+test("accepts a valid order", () => {
   assert.strictEqual(validateInput({ items: [{ sku: "A" }] }), true);
+});
+test.skip("rejects an empty order", () => {
+  assert.throws(() => validateInput({ items: [] }));
 });
 JS
   cat > package.json <<'JSON'

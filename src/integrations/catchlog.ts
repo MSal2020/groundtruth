@@ -14,6 +14,12 @@ export interface CatchEntry {
   warnings: number;
   /** Titles of the failed receipts (what the agent lied about). */
   titles: string[];
+  /** How many files the diff touched (0 = nothing to check). */
+  diffFiles?: number;
+  /** How many verifiable claims were extracted from the agent's message. */
+  claims?: number;
+  /** Test runners in scope, e.g. ["backend: npm test"]. Empty = tests not run. */
+  runners?: string[];
 }
 
 export function catchLogPath(): string {
@@ -55,6 +61,18 @@ export function summarizeCatches(entries: CatchEntry[]): string {
       (blocked.length / entries.length) * 100
     )}%)`
   );
+
+  // Surface how substantive the checks were, so "clean" isn't ambiguous.
+  const withRunnerInfo = entries.filter((e) => e.runners !== undefined);
+  if (withRunnerInfo.length) {
+    const noRunner = withRunnerInfo.filter((e) => (e.runners?.length ?? 0) === 0).length;
+    if (noRunner) {
+      lines.push(
+        `note: ${noRunner}/${withRunnerInfo.length} stop(s) had no test suite in scope — the diff was audited but no tests were run there.`
+      );
+    }
+  }
+
   if (blocked.length) {
     lines.push("", "Recent catches:");
     for (const e of blocked.slice(-10).reverse()) {

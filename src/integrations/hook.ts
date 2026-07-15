@@ -13,6 +13,7 @@ import { getDiff, isGitRepo } from "../git.js";
 import { parseTranscript } from "../claims/transcript.js";
 import { extractClaims } from "../claims/extract.js";
 import { verify } from "../verify.js";
+import { detectRunners } from "../verifiers/tests.js";
 import { renderMarkdown } from "../report/markdown.js";
 import { readStdin } from "../util/stdin.js";
 import { appendCatch } from "./catchlog.js";
@@ -50,8 +51,12 @@ export async function runHook(): Promise<number> {
   }
 
   let verdict;
+  let diffLen = 0;
+  let runnerLabels: string[] = [];
   try {
     const diff = getDiff(cwd);
+    diffLen = diff.length;
+    runnerLabels = detectRunners(cwd, diff).map((r) => (r.dir === "." ? r.label : `${r.dir}: ${r.label}`));
     verdict = await verify({ cwd, claims, diff });
   } catch {
     return 0; // fail open
@@ -67,6 +72,9 @@ export async function runHook(): Promise<number> {
       .filter((r) => r.status === "failed")
       .map((r) => r.title)
       .slice(0, 10),
+    diffFiles: diffLen,
+    claims: claims.length,
+    runners: runnerLabels,
   });
 
   if (verdict.ok) {
