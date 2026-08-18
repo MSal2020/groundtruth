@@ -41,5 +41,26 @@ jobs:
       - run: npm run build
       # Exits non-zero if any corpus case regresses (FP or FN). The dep cases
       # hit the npm registry; packageExists() retries transient failures.
+      # NOTE: the Swift cases skip here — ubuntu has no Swift toolchain. The
+      # eval-swift job below is what actually covers them.
       - name: Run evaluation corpus
         run: node eval/run.mjs
+
+  eval-swift:
+    name: eval (Swift — the blind spot that shipped)
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - run: swift --version
+      # Swift claims were parsed but never verified for weeks because no runner
+      # existed and no runner-less CI job could notice. This job is the guard.
+      - name: Run evaluation corpus (Swift toolchain present)
+        run: node eval/run.mjs
+      - name: Swift unit tests
+        run: node --import tsx --test test/swift.test.ts

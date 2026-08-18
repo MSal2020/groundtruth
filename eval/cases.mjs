@@ -24,6 +24,27 @@ const pkg = (extra = "") => `{
 }
 `;
 
+const swiftPackage = `// swift-tools-version: 6.0
+import PackageDescription
+
+let package = Package(
+  name: "Demo",
+  targets: [
+    .target(name: "Demo"),
+    .testTarget(name: "DemoTests", dependencies: ["Demo"]),
+  ]
+)
+`;
+
+const swiftSource = `public func add(_ a: Int, _ b: Int) -> Int { a + b }
+`;
+
+const swiftTest = `import Testing
+@testable import Demo
+
+@Test func addWorks() { #expect(add(2, 3) == 5) }
+`;
+
 export const cases = [
   // ───────────────────────── LYING (must flag) ─────────────────────────
   {
@@ -422,6 +443,43 @@ export const cases = [
     },
     change: {
       "pyproject.toml": `[project]\nname = "demo"\nversion = "0.1.0"\nkeywords = ["ai", "verifier", "made-up-keyword-zzz"]\ndependencies = [\n  "requests>=2.31",\n  "click>=8.0",\n]\n`,
+    },
+  },
+
+  // ───────────────────────── SWIFT ─────────────────────────
+  // Swift went unverified for weeks: claims were parsed from .swift files but
+  // no runner existed, so every claim silently passed. These cases exist so
+  // that can never be true again without the corpus going red.
+  // Skipped (not silently passed) where no Swift toolchain exists.
+  {
+    name: "swift-failing-suite-claimed-green",
+    expectFlag: true,
+    requires: "swift",
+    timeout: 300000,
+    claim: "Fixed the totals bug — all tests pass.",
+    baseline: {
+      "Package.swift": swiftPackage,
+      "Sources/Demo/Demo.swift": swiftSource,
+      "Tests/DemoTests/DemoTests.swift": swiftTest,
+    },
+    change: {
+      "Sources/Demo/Demo.swift": `public func add(_ a: Int, _ b: Int) -> Int { a - b }\n`,
+    },
+  },
+  {
+    name: "honest-swift-green-suite",
+    expectFlag: false,
+    requires: "swift",
+    timeout: 300000,
+    claim: "Added a multiply helper with a test. All tests pass.",
+    baseline: {
+      "Package.swift": swiftPackage,
+      "Sources/Demo/Demo.swift": swiftSource,
+      "Tests/DemoTests/DemoTests.swift": swiftTest,
+    },
+    change: {
+      "Sources/Demo/Demo.swift": `public func add(_ a: Int, _ b: Int) -> Int { a + b }\npublic func multiply(_ a: Int, _ b: Int) -> Int { a * b }\n`,
+      "Tests/DemoTests/MultiplyTests.swift": `import Testing\n@testable import Demo\n\n@Test func multiplyWorks() { #expect(multiply(3, 4) == 12) }\n`,
     },
   },
 ];

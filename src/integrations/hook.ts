@@ -9,7 +9,7 @@
 //       { "type": "command", "command": "npx groundtruth hook" } ] } ] } }
 
 import type { Claim } from "../types.js";
-import { getDiff, isGitRepo } from "../git.js";
+import { getDiff, isGitRepo, sessionBase } from "../git.js";
 import { parseTranscript } from "../claims/transcript.js";
 import { extractClaims } from "../claims/extract.js";
 import { verify } from "../verify.js";
@@ -41,10 +41,12 @@ export async function runHook(): Promise<number> {
   if (!isGitRepo(cwd)) return 0;
 
   let claims: Claim[] = [];
+  let startedAt: string | undefined;
   if (input.transcript_path) {
     try {
       const t = parseTranscript(input.transcript_path);
       claims = extractClaims(t.finalText);
+      startedAt = t.startedAt;
     } catch {
       /* no claims — still run the diff battery */
     }
@@ -53,8 +55,24 @@ export async function runHook(): Promise<number> {
   let verdict;
   let diffLen = 0;
   let runnerLabels: string[] = [];
+  let usedBase: string | undefined;
   try {
-    const diff = getDiff(cwd);
+    let diff = getDiff(cwd);
+
+    // A clean working tree usually means the agent committed, not that it did
+    // nothing — recover the session's commits so finished work still gets
+    // checked instead of silently passing.
+    if (diff.length === 0 && startedAt) {
+      const base = sessionBase(cwd, startedAt);
+      if (base) {
+        const committed = getDiff(cwd, { base });
+        if (committed.length > 0) {
+          diff = committed;
+          usedBase = base;
+        }
+      }
+    }
+
     diffLen = diff.length;
     runnerLabels = detectRunners(cwd, diff).map((r) => (r.dir === "." ? r.label : `${r.dir}: ${r.label}`));
     verdict = await verify({ cwd, claims, diff });
@@ -75,10 +93,28 @@ export async function runHook(): Promise<number> {
     diffFiles: diffLen,
     claims: claims.length,
     runners: runnerLabels,
+    unchecked: verdict.unchecked,
+    ...(usedBase ? { base: usedBase } : {}),
   });
 
   if (verdict.ok) {
-    // Allow the stop. Stay quiet so we don't clutter the session.
+    // Allow the stop — but say so when we could not actually check something.
+    // Silence here is what makes a passing run indistinguishable from a run
+    // that verified nothing at all.
+    const soft = verdict.receipts.filter(
+      (r) => r.status === "warning" || r.status === "unchecked"
+    );
+    if (soft.length > 0) {
+      const headline = soft[0]!.title;
+      const more = soft.length > 1 ? ` (+${soft.length - 1} more)` : "";
+      process.stdout.write(
+        JSON.stringify({
+          suppressOutput: true,
+          systemMessage: `groundtruth: ${headline}${more} — run \`groundtruth\` for detail.`,
+        })
+      );
+      return 0;
+    }
     process.stdout.write(JSON.stringify({ suppressOutput: true }));
     return 0;
   }

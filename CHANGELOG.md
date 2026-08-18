@@ -6,6 +6,23 @@ All notable changes to this project are documented here. Format loosely follows
 ## [Unreleased]
 
 ### Added
+- **Swift runner** — SwiftPM (`swift test`) and Xcode projects/workspaces
+  (`xcodebuild test`), including iOS apps, which are run on an already-booted
+  simulator when one is available. Scheme and destination are resolved lazily,
+  so detection stays cheap on every Stop hook. Both Swift Testing and legacy
+  XCTest summaries are parsed.
+- **Follows committed work.** The Stop hook usually fires on a clean working
+  tree because the agent committed — `git diff HEAD` is then empty and nothing
+  was checked. The hook now falls back to the commits made during the session.
+- **Says when it could not check.** Warnings and unchecked results are surfaced
+  in the hook's `systemMessage` instead of being swallowed by `suppressOutput`,
+  which made "verified nothing" look identical to "verified clean".
+- Xcode trouble that says nothing about honesty — no simulator, no signing
+  identity, a test target that never built, a suite that timed out — is
+  reported as *unchecked*, never as a failing suite.
+- Eval cases can declare a required toolchain (`requires: "swift"`) and are
+  reported as **skipped** where it is absent. A macOS CI job runs the Swift
+  corpus, so the language cannot silently lose coverage again.
 - **Monorepo reach** — the `tests` verifier now walks from each changed file to
   the sub-project that owns it and runs *that* suite (e.g. `backend/`), instead
   of only looking at the repo root. This was the #1 reason the tool stayed
@@ -20,6 +37,15 @@ All notable changes to this project are documented here. Format loosely follows
   run still audits tests (use `--no-tests` to skip).
 
 ### Fixed
+- **Swift test files were invisible, which turned honest work into an
+  accusation.** `TEST_FILE_RE` matched only lowercase `tests/` directories and
+  JS/Python/Go filenames, so PascalCase Swift layouts (`EmberTests/`,
+  `Tests/DemoTests/`, `ShelfReadTests.swift`) never counted as tests — and
+  `TEST_CASE_RE` knew nothing of `@Test` or XCTest's lowercase `func testX`.
+  Every "added tests" claim in a Swift project was therefore unsatisfiable and
+  reported as *"claimed to add tests, but none found"*, no matter how many
+  tests were really added. Both patterns now cover Swift (and `@Test` picks up
+  JUnit/Kotlin as a side effect).
 - A missing test *runner* (un-installed sub-project) reports `unchecked`, but a
   missing *application* module (a hallucinated import) correctly reads as a
   failing suite instead of being masked.

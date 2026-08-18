@@ -2,8 +2,12 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import type { FileDiff } from "../types.js";
 
+// Swift names test targets and files in PascalCase — `EmberTests/`,
+// `Tests/DemoTests/`, `ShelfReadTests.swift` — none of which the lowercase
+// directory patterns match. Missing them made every Swift "added tests" claim
+// unsatisfiable, so honest work was reported as a lie.
 export const TEST_FILE_RE =
-  /(?:^|\/)(?:__tests__|tests?|spec)\/|\.(?:test|spec)\.[cm]?[jt]sx?$|_test\.(?:py|go)$|test_[^/]*\.py$/;
+  /(?:^|\/)(?:__tests__|tests?|spec)\/|\.(?:test|spec)\.[cm]?[jt]sx?$|_test\.(?:py|go)$|test_[^/]*\.py$|(?:^|\/)[A-Za-z0-9_]*Tests?\/|[^/]*(?:Tests?|Spec)\.swift$/;
 
 export const CODE_FILE_RE =
   /\.(?:[cm]?[jt]sx?|py|go|rs|rb|java|kt|php|cs|swift)$/;

@@ -17,6 +17,16 @@ const ROOT = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const CLI = path.join(ROOT, "dist", "cli.js");
 const OFFLINE = process.argv.includes("--offline");
 
+/** Cases can require a toolchain (e.g. Swift) that isn't on every runner. */
+const toolCache = new Map();
+function haveTool(cmd) {
+  if (!toolCache.has(cmd)) {
+    const res = spawnSync(cmd, ["--version"], { stdio: "ignore", timeout: 60000 });
+    toolCache.set(cmd, !res.error && res.status === 0);
+  }
+  return toolCache.get(cmd);
+}
+
 if (!existsSync(CLI)) {
   console.error("Build first: npm run build");
   process.exit(1);
@@ -57,7 +67,8 @@ function runCase(c) {
       cwd: dir,
       encoding: "utf8",
       stdio: ["ignore", "pipe", "pipe"],
-      timeout: 60000,
+      // Compiled languages need a much longer leash than a node suite.
+      timeout: c.timeout ?? 60000,
     });
     const verdict = JSON.parse(res.stdout);
     return { failed: verdict.failed, warnings: verdict.warnings, verified: verdict.verified, verdict };
@@ -67,9 +78,15 @@ function runCase(c) {
 }
 
 const rows = [];
-let tp = 0, fp = 0, tn = 0, fn = 0, noise = 0;
+let tp = 0, fp = 0, tn = 0, fn = 0, noise = 0, skipped = 0;
 
 for (const c of cases) {
+  if (c.requires && !haveTool(c.requires)) {
+    rows.push({ name: c.name, ok: true, note: `SKIPPED (no ${c.requires} toolchain)` });
+    skipped++;
+    continue;
+  }
+
   let out;
   try {
     out = runCase(c);
@@ -104,7 +121,8 @@ for (const r of rows) {
 const precision = tp + fp ? tp / (tp + fp) : 1;
 const recall = tp + fn ? tp / (tp + fn) : 1;
 const f1 = precision + recall ? (2 * precision * recall) / (precision + recall) : 0;
-const accuracy = (tp + tn) / cases.length;
+const scored = cases.length - skipped;
+const accuracy = scored ? (tp + tn) / scored : 1;
 const pct = (x) => (x * 100).toFixed(1) + "%";
 
 console.log("  " + "─".repeat(56));
@@ -113,6 +131,9 @@ console.log(`  lies missed  (FN):    ${fn}   <- false negatives`);
 console.log(`  honest ok    (TN):    ${tn}`);
 console.log(`  false alarms (FP):    ${fp}   <- false positives (credibility killers)`);
 console.log(`  noise (warnings on honest cases): ${noise}`);
+if (skipped) {
+  console.log(`  skipped:              ${skipped}   <- toolchain absent; NOT covered on this runner`);
+}
 console.log("  " + "─".repeat(56));
 console.log(`  precision: ${pct(precision)}   recall: ${pct(recall)}   F1: ${pct(f1)}   accuracy: ${pct(accuracy)}`);
 console.log("");

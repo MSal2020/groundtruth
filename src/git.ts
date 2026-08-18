@@ -22,6 +22,28 @@ export function isGitRepo(cwd: string): boolean {
   }
 }
 
+/**
+ * A diff base covering everything committed since `sinceIso`.
+ *
+ * When the agent commits its work the working tree is clean and `git diff HEAD`
+ * is empty — so the most finished work is exactly the work that would otherwise
+ * go unverified. Returns null when the session committed nothing.
+ */
+export function sessionBase(cwd: string, sinceIso: string): string | null {
+  try {
+    const out = git(cwd, ["log", `--since=${sinceIso}`, "--format=%H", "HEAD"]);
+    const shas = out.split("\n").map((s) => s.trim()).filter(Boolean);
+    if (shas.length === 0) return null;
+    // Diff from the parent of the session's first commit up to HEAD.
+    const oldest = shas[shas.length - 1]!;
+    const parent = git(cwd, ["rev-parse", "--verify", `${oldest}^`]).trim();
+    return parent || null;
+  } catch {
+    // No parent (root commit) or a malformed date — no usable base.
+    return null;
+  }
+}
+
 export interface DiffOptions {
   /** Diff against this ref instead of the working tree vs HEAD. */
   base?: string;
