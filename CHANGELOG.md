@@ -3,7 +3,7 @@
 All notable changes to this project are documented here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/).
 
-## [Unreleased]
+## [0.3.0] — 2026-08-18
 
 ### Added
 - **Swift runner** — SwiftPM (`swift test`) and Xcode projects/workspaces
@@ -51,6 +51,8 @@ All notable changes to this project are documented here. Format loosely follows
   failing suite instead of being masked.
 - Scrub `NODE_TEST_CONTEXT` / `PYTEST_CURRENT_TEST` when spawning a suite so a
   nested runner executes standalone.
+
+[0.3.0]: https://github.com/MSal2020/groundtruth/releases/tag/v0.3.0
 
 ## [0.2.0] — 2026-06-15
 
