@@ -10,10 +10,13 @@ export interface TranscriptSummary {
   finalText: string;
   /** Names of tools the agent invoked anywhere in the session. */
   toolsUsed: string[];
+  /** ISO timestamp of the first entry — when this session began. */
+  startedAt?: string;
 }
 
 interface JsonlEntry {
   type?: string;
+  timestamp?: string;
   message?: {
     role?: string;
     content?: Array<{ type?: string; text?: string; name?: string }>;
@@ -25,6 +28,7 @@ export function parseTranscript(filePath: string): TranscriptSummary {
   const lines = raw.split("\n").filter((l) => l.trim());
   const toolsUsed = new Set<string>();
   let lastAssistantText = "";
+  let startedAt: string | undefined;
 
   for (const line of lines) {
     let entry: JsonlEntry;
@@ -33,6 +37,7 @@ export function parseTranscript(filePath: string): TranscriptSummary {
     } catch {
       continue;
     }
+    if (!startedAt && typeof entry.timestamp === "string") startedAt = entry.timestamp;
     const isAssistant =
       entry.type === "assistant" || entry.message?.role === "assistant";
     const content = entry.message?.content;
@@ -49,7 +54,7 @@ export function parseTranscript(filePath: string): TranscriptSummary {
     }
   }
 
-  return { finalText: lastAssistantText, toolsUsed: [...toolsUsed] };
+  return { finalText: lastAssistantText, toolsUsed: [...toolsUsed], ...(startedAt ? { startedAt } : {}) };
 }
 
 /**

@@ -20,6 +20,10 @@ export interface CatchEntry {
   claims?: number;
   /** Test runners in scope, e.g. ["backend: npm test"]. Empty = tests not run. */
   runners?: string[];
+  /** Claims we could not check (no runner, no simulator, toolchain missing). */
+  unchecked?: number;
+  /** Set when the working tree was clean and we fell back to session commits. */
+  base?: string;
 }
 
 export function catchLogPath(): string {

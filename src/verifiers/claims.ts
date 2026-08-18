@@ -11,7 +11,13 @@ import {
 // Adjudicates claims whose subject can be checked directly against the diff:
 // "added tests" and "implemented <symbol>".
 
-const TEST_CASE_RE = /\b(?:it|test|describe)\s*\(|def\s+test_|func\s+Test[A-Z]/;
+// A language whose test syntax is missing here reads as "no tests were added",
+// which turns honest work into an accusation — so every language we parse
+// claims from must appear. `@Test` covers Swift Testing, JUnit and Kotlin;
+// `func test<Upper>` covers XCTest, whose convention is lowercase `test`
+// (unlike Go's exported `func Test<Upper>`).
+const TEST_CASE_RE =
+  /\b(?:it|test|describe)\s*\(|def\s+test_|func\s+Test[A-Z]|@Test\b|func\s+test[A-Z_]/;
 
 export const claimsVerifier: Verifier = {
   name: "claims",

@@ -151,7 +151,7 @@ just run `npx groundtruth --base origin/main --markdown` anywhere.
 
 | Verifier | Catches |
 |---|---|
-| **tests** | "all tests pass" → actually runs the suite (**vitest / jest / `node --test` / pytest / `go test`**) and compares; flags green-but-zero-tests. **Monorepo-aware**: runs the suite of the sub-project (`backend/`, …) the diff actually touched. |
+| **tests** | "all tests pass" → actually runs the suite (**vitest / jest / `node --test` / pytest / `go test` / `swift test` / `xcodebuild test`**) and compares; flags green-but-zero-tests. **Monorepo-aware**: runs the suite of the sub-project (`backend/`, …) the diff actually touched. |
 | **harness** | Tests disabled to fake green: `.skip` / `.only` / `xit`, `@pytest.mark.skip`/`xfail`, `t.Skip()`, `sys.exit(0)`, deleted assertions. |
 | **stubs** | "implemented X" that's really `throw new Error("TODO")`, `raise NotImplementedError`, `panic("TODO")`, empty bodies, placeholders. |
 | **deps** | Imported/added packages that **don't exist on npm** (hallucinations / slopsquatting). |
@@ -160,24 +160,47 @@ just run `npx groundtruth --base origin/main --markdown` anywhere.
 | **build** | "it compiles / no type errors" → runs `tsc --noEmit` (`--build`). |
 | **claims** | "added tests" with no new test case; "implemented X" where X isn't in the diff. |
 
-Languages: test-running, harness-gaming and stub detection work for **JS/TS, Python, and Go**; registry checks cover **npm**, **PyPI**, and the **Go module proxy**.
+Languages: test-running works for **JS/TS, Python, Go, and Swift** (SwiftPM and
+Xcode projects, including iOS apps on the simulator); harness-gaming and stub
+detection cover JS/TS, Python and Go; registry checks cover **npm**, **PyPI**,
+and the **Go module proxy**.
+
+### Silence means checked, not skipped
+
+A verifier that can't run is worse than one that says so, because a quiet run
+looks exactly like a clean one. groundtruth therefore:
+
+- **Follows work the agent committed.** A Stop hook usually fires on a clean
+  working tree — the agent committed, so `git diff HEAD` is empty. groundtruth
+  falls back to the commits made during the session, so finishing the job
+  doesn't hide it from review.
+- **Says when it couldn't check.** No test runner, no simulator, a missing
+  toolchain or a suite that timed out are reported as *unchecked*, not folded
+  into a pass.
+- **Never turns infrastructure trouble into an accusation.** A simulator that
+  won't boot or a project that won't sign is reported as unchecked; only a
+  genuinely red suite is a failure.
 
 ## Does it actually work?
 
 A verifier that cries wolf is worse than useless, so groundtruth ships with an
 evaluation corpus of real scenarios — overclaims it must catch (across JS/TS,
-Python, and Go) *and* honest changes it must leave alone (path aliases,
+Python, Go, and Swift) *and* honest changes it must leave alone (path aliases,
 `workspace:` packages, `#` subpath imports, private scoped packages, legitimately
-skipped tests, real refactors, TODOs in docs).
+skipped tests, real refactors, TODOs in docs, Swift tests in `EmberTests/`-style
+targets).
 
 ```
 $ npm run eval
-  lying caught (TP):    21
+  lying caught (TP):    23
   lies missed  (FN):    0
-  honest ok    (TN):    26
+  honest ok    (TN):    28
   false alarms (FP):    0   <- false positives (credibility killers)
   precision: 100.0%   recall: 100.0%   F1: 100.0%
 ```
+
+Cases requiring a toolchain the runner lacks are reported as **skipped**, never
+as passed — a corpus that silently drops a language is how a blind spot ships.
 
 This runs in CI on every PR and **must stay at 100%** to merge. Run it yourself
 with `npm run eval`. Found a lie it misses or an honest change it flags? That's
@@ -188,6 +211,9 @@ the most valuable issue you can open — see the templates.
 - [x] Python & Go runners (pytest / `go test`), harness + stub detection, PyPI checks
 - [x] Go module dependency hallucination checks (Go module proxy)
 - [x] GitHub Action with sticky PR receipts
+- [x] Swift runner — SwiftPM and Xcode/iOS projects on the simulator
+- [x] Verify work the agent already committed (clean tree ≠ nothing to check)
+- [ ] Harness + stub detection for Swift (`XCTSkip`, `fatalError("TODO")`)
 - [ ] Coverage-delta gate ("you said you tested it, but coverage didn't move")
 - [ ] VS Code surfacing
 - [ ] Optional `--llm` claim extraction for free-form summaries
