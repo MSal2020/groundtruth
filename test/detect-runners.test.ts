@@ -89,3 +89,16 @@ test("override wins and runs at root", () => {
     rmSync(repo, { recursive: true, force: true });
   }
 });
+
+test("pytest runs through an interpreter that exists on this platform", () => {
+  // On Windows, `python3` is usually the Microsoft Store stub (exit 9009), which would turn every Python
+  // suite RED for a reason unrelated to the agent's work.
+  const repo = tmpRepo({ "pyproject.toml": "[project]\nname = 'x'\n" });
+  try {
+    const runners = detectRunners(repo, [diffFile("src/x.py")]);
+    assert.equal(runners[0]!.label, "pytest");
+    assert.equal(runners[0]!.cmd, process.platform === "win32" ? "python" : "python3");
+  } finally {
+    rmSync(repo, { recursive: true, force: true });
+  }
+});
