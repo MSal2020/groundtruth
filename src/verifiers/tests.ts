@@ -59,7 +59,7 @@ function runnerAt(dir: string): Runner | null {
     }
   }
   if (PY_MARKERS.some((m) => existsSync(path.join(dir, m)))) {
-    return { ecosystem: "python", cmd: "python3", args: ["-m", "pytest", "-q"], label: "pytest" };
+    return { ecosystem: "python", cmd: process.platform === "win32" ? "python" : "python3", args: ["-m", "pytest", "-q"], label: "pytest" };
   }
   if (existsSync(path.join(dir, "go.mod"))) {
     return { ecosystem: "go", cmd: "go", args: ["test", "./..."], label: "go test ./..." };
